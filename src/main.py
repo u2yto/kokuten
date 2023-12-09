@@ -1,7 +1,9 @@
-import cv2
+import os
 import sys
 from copy import deepcopy
-import os
+
+import cv2
+import numpy as np
 
 IMG_PATH = sys.argv[1]
 
@@ -17,7 +19,10 @@ dim = (width, height)
 
 img = cv2.resize(original, dim, interpolation=cv2.INTER_AREA)
 
+# detect circle
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+
+# TODO: add median blur
 
 circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.0, 100, 30, 60)
 
@@ -34,19 +39,67 @@ except IndexError:
     print("failed to detect circles")
     exit(1)
 
-target_circle = circles[0][target_index]
+target_circle = circles[0][target_index]  # [center_x, center_y, radius]
+target_circle = np.uint16(np.around(target_circle))  # convert into int
 
-# draw circle on the image
-img_res = deepcopy(img)
+# crop
+target_circle = np.uint16(np.around(target_circle))
+crop_start_x = target_circle[0] - target_circle[2]
+crop_end_x = target_circle[0] + target_circle[2]
+crop_start_y = target_circle[1] - target_circle[2]
+crop_end_y = target_circle[1] + target_circle[2]
+cropped = img[crop_start_y:crop_end_y, crop_start_x:crop_end_x]
 
-# 円周を描画する
-cv2.circle(img_res, (int(target_circle[0]), int(target_circle[1])), int(target_circle[2]), (0, 165, 255), 5)
-# 中心点を描画する
-cv2.circle(img_res, (int(target_circle[0]), int(target_circle[1])), 2, (0, 0, 255), 3)
+# make a mask
+gap = int(height / 100)  # 1% of height
+mask = np.full(cropped.shape[:2], 255, dtype=img.dtype)
+mask = cv2.circle(
+    mask,
+    (target_circle[2], target_circle[2]),
+    target_circle[2] - gap,
+    color=0,
+    thickness=-1,
+)  # draw inside the circle
+mask = cv2.circle(
+    mask, (target_circle[2], target_circle[2]), gap, color=255, thickness=-1
+)  # draw center point
 
-# save the result
+# mask
+masked = deepcopy(cropped)
+
+masked[mask == 255] = 255
+
+# threshold
+masked_blurred = cv2.bilateralFilter(masked, 9, 75, 75)
+masked_hsv = cv2.cvtColor(masked_blurred, cv2.COLOR_BGR2HSV)
+masked_threshold = cv2.bitwise_not(cv2.inRange(masked_hsv, (0, 0, 0), (255, 30, 140)))
+
+# detect sunspots
+masked_height = img.shape[0]
+
+contours, hierarchy = cv2.findContours(
+    masked_threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
+)
+
+# filter sunspots
+contours = list(
+    filter(
+        lambda x: masked_height / 150 < cv2.arcLength(x, True) < masked_height / 45,
+        contours,
+    )
+)
+
+# draw sunspots
+img_res = deepcopy(masked)
+
+img_res = cv2.drawContours(img_res, contours, -1, color=(0, 255, 0), thickness=1)
+
+# 
+
+# save the result as an image
 filename = os.path.basename(IMG_PATH)
-save_status = cv2.imwrite('dist/' + filename, img_res)
+
+save_status = cv2.imwrite("dist/" + filename, img_res)
 if not save_status:
     print("failed to save the result")
     exit(1)

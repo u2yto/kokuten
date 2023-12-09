@@ -7,8 +7,10 @@ IMG_PATH = sys.argv[1]
 
 original = cv2.imread(IMG_PATH)
 
-# resize the height to 512px while keeping the aspect ratio
-height = 512
+print(f"Starting processing {IMG_PATH}...")
+
+# resize the height to 1024px while keeping the aspect ratio
+height = 1024
 scale_rate = height / original.shape[0]
 width = int(original.shape[1] * scale_rate)
 dim = (width, height)
@@ -44,4 +46,9 @@ cv2.circle(img_res, (int(target_circle[0]), int(target_circle[1])), 2, (0, 0, 25
 
 # save the result
 filename = os.path.basename(IMG_PATH)
-cv2.imwrite('dist/' + filename, img_res)
+save_status = cv2.imwrite('dist/' + filename, img_res)
+if not save_status:
+    print("failed to save the result")
+    exit(1)
+
+print(f"Succeeded processing {IMG_PATH}")

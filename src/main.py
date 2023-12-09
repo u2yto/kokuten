@@ -22,9 +22,9 @@ img = cv2.resize(original, dim, interpolation=cv2.INTER_AREA)
 # detect circle
 gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
 
-# TODO: add median blur
+gray_blurred = cv2.medianBlur(gray, 3)
 
-circles = cv2.HoughCircles(gray, cv2.HOUGH_GRADIENT, 1.0, 100, 30, 60)
+circles = cv2.HoughCircles(gray_blurred, cv2.HOUGH_GRADIENT, 1.0, 100, 30, 60)
 
 # find the biggest circle
 max_radius = 0

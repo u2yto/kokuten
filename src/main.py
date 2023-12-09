@@ -1,3 +1,4 @@
+import json
 import os
 import sys
 from copy import deepcopy
@@ -82,7 +83,7 @@ contours, hierarchy = cv2.findContours(
 )
 
 # filter sunspots
-contours = list(
+sunspots = list(
     filter(
         lambda x: masked_height / 150 < cv2.arcLength(x, True) < masked_height / 45,
         contours,
@@ -92,16 +93,35 @@ contours = list(
 # draw sunspots
 img_res = deepcopy(masked)
 
-img_res = cv2.drawContours(img_res, contours, -1, color=(0, 255, 0), thickness=1)
+img_res = cv2.drawContours(img_res, sunspots, -1, color=(0, 255, 0), thickness=1)
 
-# 
+# save the result as JSON
+filename = os.path.basename(IMG_PATH) + ".json"
+result_sunspots = list(map(lambda x: cv2.moments(x), sunspots))  # calculate moments
+result_sunspots = list(
+    map(
+        lambda m: {"x": m["m10"] / m["m00"], "y": m["m01"] / m["m00"]}, result_sunspots
+    )  # calculate centroids
+)
+result = {
+    "entire_height": img_res.shape[0],
+    "entire_width": img_res.shape[1],
+    "sunspots": result_sunspots,
+}
+
+try:
+    with open("dist/" + filename, "w") as f:
+        json.dump(result, f)
+except FileNotFoundError:
+    print("failed to save the result as JSON")
+    exit(1)
 
 # save the result as an image
 filename = os.path.basename(IMG_PATH)
 
 save_status = cv2.imwrite("dist/" + filename, img_res)
 if not save_status:
-    print("failed to save the result")
+    print("failed to save the result as an image")
     exit(1)
 
 print(f"Succeeded processing {IMG_PATH}")

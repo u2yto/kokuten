@@ -76,8 +76,11 @@ masked_hsv = cv2.cvtColor(masked_blurred, cv2.COLOR_BGR2HSV)
 masked_threshold = cv2.inRange(masked_hsv, (0, 0, 0), (255, 110, 170))
 
 # morph
-kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 4))
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 1))
 masked_morphed = cv2.erode(masked_threshold, kernel)
+masked_morphed = cv2.dilate(masked_morphed, kernel, iterations=2)
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (1, 2))
+masked_morphed = cv2.erode(masked_morphed, kernel)
 masked_morphed = cv2.dilate(masked_morphed, kernel, iterations=2)
 
 # detect sunspots
@@ -91,7 +94,7 @@ params.maxThreshold = 255
 # Filter by Area.
 params.filterByArea = True
 params.minArea = 1
-params.maxArea = 100
+params.maxArea = 1000
 
 # Don't filter by Circularity
 params.filterByCircularity = False

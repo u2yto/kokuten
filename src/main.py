@@ -75,34 +75,56 @@ masked_blurred = cv2.bilateralFilter(masked, 9, 75, 75)
 masked_hsv = cv2.cvtColor(masked_blurred, cv2.COLOR_BGR2HSV)
 masked_threshold = cv2.bitwise_not(cv2.inRange(masked_hsv, (0, 0, 0), (255, 30, 140)))
 
+# morph
+kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 4))
+masked_morphed = cv2.erode(masked_threshold, kernel)
+masked_morphed = cv2.dilate(masked_morphed, kernel, iterations=2)
+
 # detect sunspots
-masked_height = img.shape[0]
+params = cv2.SimpleBlobDetector_Params()
 
-contours, hierarchy = cv2.findContours(
-    masked_threshold, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE
-)
+# Change thresholds
+params.minThreshold = 10
+params.maxThreshold = 255
 
-# filter sunspots
-sunspots = list(
-    filter(
-        lambda x: masked_height / 150 < cv2.arcLength(x, True) < masked_height / 45,
-        contours,
-    )
-)
+# Filter by Area.
+params.filterByArea = True
+params.minArea = 1
+params.maxArea = 100
+
+# Don't filter by Circularity
+params.filterByCircularity = False
+params.minCircularity = 0.1
+
+# Don't filter by Convexity
+params.filterByConvexity = False
+params.minConvexity = 0.87
+
+# Don't filter by Inertia
+params.filterByInertia = False
+params.minInertiaRatio = 0.01
+
+# Create a detector with the parameters
+ver = (cv2.__version__).split(".")
+if int(ver[0]) < 3:
+    detector = cv2.SimpleBlobDetector(params)
+else:
+    detector = cv2.SimpleBlobDetector_create(params)
+
+keypoints = detector.detect(masked_morphed)
+
+sunspots = cv2.KeyPoint_convert(keypoints)  # List[x, y]
 
 # draw sunspots
 img_res = deepcopy(masked)
 
-img_res = cv2.drawContours(img_res, sunspots, -1, color=(0, 255, 0), thickness=1)
+blank = np.zeros((1,1))
+
+img_res = cv2.drawKeypoints(img_res, keypoints, blank, (0,255,0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
 
 # save the result as JSON
 filename = os.path.basename(IMG_PATH) + ".json"
-result_sunspots = list(map(lambda x: cv2.moments(x), sunspots))  # calculate moments
-result_sunspots = list(
-    map(
-        lambda m: {"x": m["m10"] / m["m00"], "y": m["m01"] / m["m00"]}, result_sunspots
-    )  # calculate centroids
-)
+result_sunspots = list(map(lambda p: {"x": int(p[0]), "y": int(p[1])}, sunspots)) # conver to dict
 result = {
     "entire_height": img_res.shape[0],
     "entire_width": img_res.shape[1],

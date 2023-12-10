@@ -73,7 +73,7 @@ masked[mask == 255] = 255
 # threshold
 masked_blurred = cv2.bilateralFilter(masked, 9, 75, 75)
 masked_hsv = cv2.cvtColor(masked_blurred, cv2.COLOR_BGR2HSV)
-masked_threshold = cv2.bitwise_not(cv2.inRange(masked_hsv, (0, 0, 0), (255, 30, 140)))
+masked_threshold = cv2.inRange(masked_hsv, (0, 0, 0), (255, 110, 170))
 
 # morph
 kernel = cv2.getStructuringElement(cv2.MORPH_RECT, (2, 4))
@@ -81,6 +81,7 @@ masked_morphed = cv2.erode(masked_threshold, kernel)
 masked_morphed = cv2.dilate(masked_morphed, kernel, iterations=2)
 
 # detect sunspots
+masked_inv = cv2.bitwise_not(masked_morphed)
 params = cv2.SimpleBlobDetector_Params()
 
 # Change thresholds
@@ -111,20 +112,26 @@ if int(ver[0]) < 3:
 else:
     detector = cv2.SimpleBlobDetector_create(params)
 
-keypoints = detector.detect(masked_morphed)
+keypoints = detector.detect(masked_inv)
 
 sunspots = cv2.KeyPoint_convert(keypoints)  # List[x, y]
 
 # draw sunspots
 img_res = deepcopy(masked)
 
-blank = np.zeros((1,1))
+blank = np.zeros((1, 1))
 
-img_res = cv2.drawKeypoints(img_res, keypoints, blank, (0,255,0), cv2.DRAW_MATCHES_FLAGS_DEFAULT)
+img_res = cv2.drawKeypoints(
+    img_res, keypoints, blank, (0, 255, 0), cv2.DRAW_MATCHES_FLAGS_DEFAULT
+)
+
+print(sunspots)
 
 # save the result as JSON
 filename = os.path.basename(IMG_PATH) + ".json"
-result_sunspots = list(map(lambda p: {"x": int(p[0]), "y": int(p[1])}, sunspots)) # conver to dict
+result_sunspots = list(
+    map(lambda p: {"x": int(p[0]), "y": int(p[1])}, sunspots)
+)  # conver to dict
 result = {
     "entire_height": img_res.shape[0],
     "entire_width": img_res.shape[1],
